@@ -22,14 +22,14 @@ export function registerApiKeyTools(server: McpServer): void {
     title: "Create API Key",
     description: "Create a new API key for server-to-server integration. The key value is only shown once — save it immediately.",
     inputSchema: {
-      name: z.string().describe("Descriptive name for the key"),
-      permissions: z.array(z.string()).optional().describe("Optional permissions to restrict the key's access"),
+      name: z.string().max(200).describe("Descriptive name for the key"),
+      permissions: z.array(z.string().max(200)).optional().describe("Optional permissions to restrict the key's access"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
       const res = await makeApiRequest<{ id: string; key: string; name: string }>("api-keys", "POST", params);
-      return textResult(`API Key created.\nName: ${res.name}\nID: ${res.id}\nKey: ${res.key}\n\n⚠️ Save this key now — it won't be shown again.`);
+      return textResult(`API Key created.\nName: ${res.name}\nID: ${res.id}\nKey: ${res.key}\n\n⚠️ SECURITY: Save this key immediately — it will NOT be shown again.\n⚠️ This key may appear in conversation history and logs. Rotate if compromised.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
 

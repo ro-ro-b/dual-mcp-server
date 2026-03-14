@@ -3,6 +3,7 @@ import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { IdParam } from "../schemas/common.js";
+import { assertExternalUrl } from "../services/security.js";
 
 export function registerStorageTools(server: McpServer): void {
 
@@ -10,12 +11,13 @@ export function registerStorageTools(server: McpServer): void {
     title: "Upload File",
     description: "Upload a file to DUAL storage. Returns a public URL. Useful for template assets, face images, and attachments.",
     inputSchema: {
-      file_url: z.string().describe("URL of the file to upload (the server will fetch and upload it)"),
+      file_url: z.string().max(2048).describe("URL of the file to upload (the server will fetch and upload it)"),
       folder: z.string().optional().describe("Optional folder path for organization"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
+      assertExternalUrl(params.file_url);
       const res = await makeApiRequest<{ id: string; url: string }>("storage/upload", "POST", params);
       return textResult(`File uploaded.\nID: ${res.id}\nURL: ${res.url}`);
     } catch (e) { return errorResult(handleApiError(e)); }

@@ -10,8 +10,8 @@ export function registerSupportTools(server: McpServer): void {
     title: "Request Feature Access",
     description: "Request access to a gated platform feature.",
     inputSchema: {
-      feature: z.string().describe("Feature name to request access to"),
-      reason: z.string().optional().describe("Reason for the request"),
+      feature: z.string().max(200).describe("Feature name to request access to"),
+      reason: z.string().max(5000).optional().describe("Reason for the request"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -25,8 +25,8 @@ export function registerSupportTools(server: McpServer): void {
     title: "List Support Messages",
     description: "List support messages.",
     inputSchema: {
-      wallet_id: z.string().optional().describe("Filter by wallet ID"),
-      prefix: z.string().optional().describe("Filter by subject prefix"),
+      wallet_id: z.string().max(200).optional().describe("Filter by wallet ID"),
+      prefix: z.string().max(200).optional().describe("Filter by subject prefix"),
       ...CursorPaginationSchema,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -41,8 +41,8 @@ export function registerSupportTools(server: McpServer): void {
     title: "Send Support Message",
     description: "Send a support message to the DUAL team.",
     inputSchema: {
-      subject: z.string().describe("Message subject"),
-      body: z.string().describe("Message body"),
+      subject: z.string().max(500).describe("Message subject"),
+      body: z.string().max(5000).describe("Message body"),
       public: z.boolean().optional().describe("Whether the message is public"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

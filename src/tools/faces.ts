@@ -22,8 +22,8 @@ export function registerFaceTools(server: McpServer): void {
     title: "Create Face",
     description: "Create a visual face for a template. Types: image, image_progress, image_policy, image_layered, 3d, web.",
     inputSchema: {
-      template_id: z.string().describe("Template to attach the face to"),
-      display_url: z.string().describe("URL of the visual asset"),
+      template_id: z.string().max(200).describe("Template to attach the face to"),
+      display_url: z.string().max(2048).describe("URL of the visual asset"),
       type: z.enum(["image", "image_progress", "image_policy", "image_layered", "3d", "web"]).describe("Face type"),
       platform: z.enum(["web", "ios", "android"]).optional().describe("Target platform (optional)"),
     },
@@ -52,7 +52,7 @@ export function registerFaceTools(server: McpServer): void {
     description: "Update a face's display URL or type.",
     inputSchema: {
       face_id: IdParam,
-      display_url: z.string().optional().describe("New display URL"),
+      display_url: z.string().max(2048).optional().describe("New display URL"),
       type: z.enum(["image", "image_progress", "image_policy", "image_layered", "3d", "web"]).optional().describe("New face type"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },

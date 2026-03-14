@@ -10,14 +10,17 @@ export function registerWalletTools(server: McpServer): void {
     title: "Login to DUAL",
     description: "Authenticate with email/phone and password. Returns JWT tokens for subsequent API calls. Sets auth automatically for this session.",
     inputSchema: {
-      email: z.string().optional().describe("Email address"),
-      phone_number: z.string().optional().describe("Phone number (alternative to email)"),
-      password: z.string().describe("Account password"),
-      otp: z.string().optional().describe("One-time password for 2FA"),
+      email: z.string().max(320).optional().describe("Email address"),
+      phone_number: z.string().max(20).optional().describe("Phone number (alternative to email)"),
+      password: z.string().min(8).max(128).describe("Account password"),
+      otp: z.string().max(20).optional().describe("One-time password for 2FA"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
+      if (!params.email && !params.phone_number) {
+        return errorResult("Error: Either email or phone_number is required for login.");
+      }
       const res = await makeApiRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
         "wallets/login", "POST", params
       );
@@ -31,7 +34,7 @@ export function registerWalletTools(server: McpServer): void {
     title: "Guest Login",
     description: "Create a guest session with limited permissions. No credentials required.",
     inputSchema: {
-      nickname: z.string().optional().describe("Optional display name for the guest"),
+      nickname: z.string().max(200).optional().describe("Optional display name for the guest"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
@@ -49,14 +52,17 @@ export function registerWalletTools(server: McpServer): void {
     title: "Register DUAL Wallet",
     description: "Create a new wallet account. A verification code will be sent to the email/phone provided.",
     inputSchema: {
-      email: z.string().optional().describe("Email address"),
-      phone_number: z.string().optional().describe("Phone number (alternative to email)"),
-      password: z.string().min(8).describe("Account password (min 8 characters)"),
-      nickname: z.string().optional().describe("Display name"),
+      email: z.string().max(320).optional().describe("Email address"),
+      phone_number: z.string().max(20).optional().describe("Phone number (alternative to email)"),
+      password: z.string().min(8).max(128).describe("Account password (min 8 characters)"),
+      nickname: z.string().max(200).optional().describe("Display name"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
+      if (!params.email && !params.phone_number) {
+        return errorResult("Error: Either email or phone_number is required for registration.");
+      }
       await makeApiRequest("wallets/register", "POST", params);
       return textResult("Registration initiated. A verification code has been sent — use dual_register_verify to complete.");
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -67,7 +73,7 @@ export function registerWalletTools(server: McpServer): void {
     title: "Verify Registration",
     description: "Complete registration by submitting the verification code sent to your email/phone.",
     inputSchema: {
-      code: z.string().describe("Verification code received via email/SMS"),
+      code: z.string().max(20).describe("Verification code received via email/SMS"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -85,7 +91,7 @@ export function registerWalletTools(server: McpServer): void {
     title: "Refresh Access Token",
     description: "Exchange a refresh token for a new access token.",
     inputSchema: {
-      refresh_token: z.string().describe("Refresh token from login"),
+      refresh_token: z.string().max(2048).describe("Refresh token from login"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -116,9 +122,9 @@ export function registerWalletTools(server: McpServer): void {
     title: "Update Current Wallet",
     description: "Update the authenticated wallet's nickname, language, or avatar.",
     inputSchema: {
-      nickname: z.string().optional().describe("New display name"),
-      language: z.string().optional().describe("Language code (e.g. 'en')"),
-      avatar: z.string().optional().describe("Avatar URL"),
+      nickname: z.string().max(200).optional().describe("New display name"),
+      language: z.string().max(10).optional().describe("Language code (e.g. 'en')"),
+      avatar: z.string().max(2048).optional().describe("Avatar URL"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -133,7 +139,7 @@ export function registerWalletTools(server: McpServer): void {
     title: "Get Wallet by ID",
     description: "Retrieve a wallet's public profile by its ID.",
     inputSchema: {
-      wallet_id: z.string().describe("Wallet ID to look up"),
+      wallet_id: z.string().max(200).describe("Wallet ID to look up"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -148,12 +154,15 @@ export function registerWalletTools(server: McpServer): void {
     title: "Request Password Reset",
     description: "Send a password reset code to the wallet's email/phone.",
     inputSchema: {
-      email: z.string().optional().describe("Email address"),
-      phone_number: z.string().optional().describe("Phone number"),
+      email: z.string().max(320).optional().describe("Email address"),
+      phone_number: z.string().max(20).optional().describe("Phone number"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
+      if (!params.email && !params.phone_number) {
+        return errorResult("Error: Either email or phone_number is required for password reset.");
+      }
       await makeApiRequest("wallets/reset-code", "POST", params);
       return textResult("Reset code sent. Use dual_reset_password_verify with the code and new password.");
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -164,8 +173,8 @@ export function registerWalletTools(server: McpServer): void {
     title: "Verify Password Reset",
     description: "Submit reset code and set a new password.",
     inputSchema: {
-      code: z.string().describe("Reset code received"),
-      new_password: z.string().min(8).describe("New password (min 8 characters)"),
+      code: z.string().max(20).describe("Reset code received"),
+      new_password: z.string().min(8).max(128).describe("New password (min 8 characters)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {

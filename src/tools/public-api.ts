@@ -3,6 +3,7 @@ import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
+import { assertNoOperatorKeys } from "../services/security.js";
 
 export function registerPublicApiTools(server: McpServer): void {
 
@@ -55,6 +56,7 @@ export function registerPublicApiTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
+      assertNoOperatorKeys(params.filter);
       const res = await makeApiRequest<unknown>("public/objects/search", "POST", params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }

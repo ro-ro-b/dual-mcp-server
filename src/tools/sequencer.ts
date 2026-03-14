@@ -34,8 +34,8 @@ export function registerSequencerTools(server: McpServer): void {
     title: "List ZK Checkpoints",
     description: "List ZK-rollup checkpoints. Each checkpoint contains a state root and proof that anchors batches to L1.",
     inputSchema: {
-      prev_state_root: z.string().optional().describe("Filter by previous state root"),
-      next_state_root: z.string().optional().describe("Filter by next state root"),
+      prev_state_root: z.string().max(500).optional().describe("Filter by previous state root"),
+      next_state_root: z.string().max(500).optional().describe("Filter by next state root"),
       ...CursorPaginationSchema,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },

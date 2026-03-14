@@ -22,9 +22,9 @@ export function registerPaymentTools(server: McpServer): void {
     title: "List Deposits",
     description: "List deposit transactions. Filter by transaction hash, token, or token address.",
     inputSchema: {
-      tx_hash: z.string().optional().describe("Filter by transaction hash"),
-      token: z.string().optional().describe("Filter by token symbol"),
-      token_address: z.string().optional().describe("Filter by token contract address"),
+      tx_hash: z.string().max(500).optional().describe("Filter by transaction hash"),
+      token: z.string().max(200).optional().describe("Filter by token symbol"),
+      token_address: z.string().max(200).optional().describe("Filter by token contract address"),
       ...CursorPaginationSchema,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },

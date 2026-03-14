@@ -14,10 +14,12 @@
  * Transport:
  *   - stdio (default): For local integrations with Claude, Cursor, etc.
  *   - http: Set TRANSPORT=http for remote/multi-client use
+ *     - Set MCP_SERVER_API_KEY to protect the HTTP endpoint (REQUIRED)
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { MCP_SERVER_API_KEY } from "./constants.js";
 
 // Tool registration modules
 import { registerWalletTools } from "./tools/wallets.js";
@@ -73,9 +75,84 @@ async function runHTTP(): Promise<void> {
   const { StreamableHTTPServerTransport } = await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
 
   const app = express();
-  app.use(express.json());
 
-  app.post("/mcp", async (req, res) => {
+  // --- H1: Security middleware ---
+  // Body size limit (prevents DoS via large payloads)
+  app.use(express.json({ limit: "1mb" }));
+
+  // Security headers (subset of helmet, inline to avoid extra dependency)
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-XSS-Protection", "0"); // modern approach: rely on CSP
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Content-Security-Policy", "default-src 'none'");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    next();
+  });
+
+  // CORS: deny all by default (server-to-server use)
+  app.use((_req, res, next) => {
+    const allowedOrigin = process.env.CORS_ORIGIN;
+    if (allowedOrigin) {
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+      res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+    }
+    next();
+  });
+
+  // Rate limiting (simple in-memory, H1)
+  const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+  const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+  const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || "100");
+
+  app.use((req, res, next) => {
+    const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const entry = rateLimitMap.get(clientIp);
+
+    if (!entry || now > entry.resetAt) {
+      rateLimitMap.set(clientIp, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      return next();
+    }
+
+    entry.count++;
+    if (entry.count > RATE_LIMIT_MAX) {
+      res.setHeader("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
+    }
+    next();
+  });
+
+  // Periodic cleanup of rate limit map
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of rateLimitMap) {
+      if (now > val.resetAt) rateLimitMap.delete(key);
+    }
+  }, RATE_LIMIT_WINDOW);
+
+  // --- C1: Authentication middleware ---
+  function authMiddleware(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction): void {
+    // Skip auth if no server key is configured (dev mode)
+    if (!MCP_SERVER_API_KEY) {
+      console.error("WARNING: MCP_SERVER_API_KEY not set — HTTP endpoint is UNPROTECTED");
+      return next();
+    }
+
+    const providedKey =
+      (req.headers["x-api-key"] as string | undefined) ??
+      (req.headers["authorization"]?.startsWith("Bearer ") ? req.headers["authorization"].slice(7) : undefined);
+
+    if (!providedKey || providedKey !== MCP_SERVER_API_KEY) {
+      res.status(401).json({ error: "Unauthorized. Provide a valid X-API-Key or Authorization: Bearer <key> header." });
+      return;
+    }
+    next();
+  }
+
+  app.post("/mcp", authMiddleware, async (req, res) => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -85,14 +162,20 @@ async function runHTTP(): Promise<void> {
     await transport.handleRequest(req, res, req.body);
   });
 
-  // Health check
+  // M9: Health check — minimal info disclosure
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", server: "dual-mcp-server", version: "1.0.0" });
+    res.json({ status: "ok" });
   });
 
-  const port = parseInt(process.env.PORT || "3100");
+  // M8: Port validation
+  const rawPort = parseInt(process.env.PORT || "3100");
+  const port = Number.isNaN(rawPort) ? 3100 : Math.max(1, Math.min(65535, rawPort));
+
   app.listen(port, () => {
     console.error(`DUAL MCP server running on http://localhost:${port}/mcp`);
+    if (!MCP_SERVER_API_KEY) {
+      console.error("⚠️  WARNING: Set MCP_SERVER_API_KEY to protect the HTTP endpoint!");
+    }
   });
 }
 

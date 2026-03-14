@@ -1,4 +1,5 @@
 import { CHARACTER_LIMIT } from "../constants.js";
+import { sanitizeString } from "./security.js";
 
 /** Truncate response if it exceeds character limit */
 export function truncateIfNeeded(text: string, itemCount?: number): string {
@@ -11,16 +12,19 @@ export function truncateIfNeeded(text: string, itemCount?: number): string {
   return cleanTruncated + `\n\n---\n*Response truncated (${text.length} chars).${itemCount ? ` Use limit/offset to paginate through ${itemCount} items.` : " Use more specific filters to reduce results."}*`;
 }
 
-/** Format a timestamp to human-readable */
+/** Format a timestamp to human-readable (L4: sanitized output) */
 export function formatDate(iso: string | undefined): string {
   if (!iso) return "N/A";
   try {
-    return new Date(iso).toLocaleString("en-US", {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return "Invalid date";
+    return date.toLocaleString("en-US", {
       year: "numeric", month: "short", day: "numeric",
       hour: "2-digit", minute: "2-digit",
     });
   } catch {
-    return iso;
+    // L4: Don't return raw input — sanitize it
+    return sanitizeString(iso).slice(0, 50);
   }
 }
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
+import { assertNoOperatorKeys } from "../services/security.js";
 
 export function registerActionTools(server: McpServer): void {
 
@@ -12,8 +13,8 @@ export function registerActionTools(server: McpServer): void {
 Examples: mint tokens, transfer ownership, redeem rewards, update status.
 The action_type must match a registered action type, and the object must belong to a template that allows it.`,
     inputSchema: {
-      action_type: z.string().describe("Action type name (e.g. 'Transfer', 'Redeem', 'Mint')"),
-      object_id: z.string().describe("Target object ID"),
+      action_type: z.string().max(200).describe("Action type name (e.g. 'Transfer', 'Redeem', 'Mint')"),
+      object_id: z.string().max(200).describe("Target object ID"),
       payload: z.record(z.unknown()).optional().describe("Action payload data (depends on action type schema)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -30,14 +31,19 @@ The action_type must match a registered action type, and the object must belong 
 Useful for complex operations like: mint + transfer + configure in one transaction.`,
     inputSchema: {
       actions: z.array(z.object({
-        action_type: z.string().describe("Action type name"),
-        object_id: z.string().describe("Target object ID"),
+        action_type: z.string().max(200).describe("Action type name"),
+        object_id: z.string().max(200).describe("Target object ID"),
         payload: z.record(z.unknown()).optional().describe("Action payload"),
       })).min(1).max(50).describe("Array of actions to execute atomically (1-50)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
+      // M7: Validate total batch payload size
+      const payloadSize = JSON.stringify(params.actions).length;
+      if (payloadSize > 500000) {
+        return errorResult("Error: Batch payload too large (max 500KB total).");
+      }
       const res = await makeApiRequest<Record<string, unknown>>("ebus/actions/batch", "POST", params);
       return textResult(`Batch of ${params.actions.length} actions executed.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -75,7 +81,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     title: "List Action Types",
     description: "List all registered action types. Action types define what operations can be performed on objects.",
     inputSchema: {
-      name: z.string().optional().describe("Filter by action type name"),
+      name: z.string().max(200).optional().describe("Filter by action type name"),
       limit: z.number().int().min(1).max(100).default(20).optional().describe("Max results"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -90,8 +96,8 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     title: "Create Action Type",
     description: "Register a new action type with an optional JSON schema for payload validation.",
     inputSchema: {
-      name: z.string().describe("Action type name (e.g. 'Transfer', 'Redeem', 'UpdateStatus')"),
-      description: z.string().optional().describe("Human-readable description"),
+      name: z.string().max(200).describe("Action type name (e.g. 'Transfer', 'Redeem', 'UpdateStatus')"),
+      description: z.string().max(5000).optional().describe("Human-readable description"),
       schema: z.record(z.unknown()).optional().describe("JSON Schema for validating action payloads"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -107,8 +113,8 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     description: "Update an action type's name, description, or payload schema.",
     inputSchema: {
       action_type_id: IdParam,
-      name: z.string().optional().describe("New name"),
-      description: z.string().optional().describe("New description"),
+      name: z.string().max(200).optional().describe("New name"),
+      description: z.string().max(5000).optional().describe("New description"),
       schema: z.record(z.unknown()).optional().describe("Updated JSON Schema"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },

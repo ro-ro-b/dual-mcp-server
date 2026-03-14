@@ -3,6 +3,7 @@ import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
+import { assertNoOperatorKeys } from "../services/security.js";
 
 export function registerObjectTools(server: McpServer): void {
 
@@ -104,6 +105,7 @@ Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
+      assertNoOperatorKeys(params.filter);
       const res = await makeApiRequest<unknown>("objects/search", "POST", params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -118,6 +120,7 @@ Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
+      assertNoOperatorKeys(params.filter);
       const res = await makeApiRequest<{ count: number }>("objects/count", "POST", params);
       return textResult(`Count: ${res.count}`);
     } catch (e) { return errorResult(handleApiError(e)); }

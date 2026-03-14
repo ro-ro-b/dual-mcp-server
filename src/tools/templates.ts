@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
-import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
+import { CursorPaginationSchema, IdParam, boundedJsonObject } from "../schemas/common.js";
 
 export function registerTemplateTools(server: McpServer): void {
 
@@ -28,9 +28,9 @@ export function registerTemplateTools(server: McpServer): void {
 Specify the property schema, allowed actions, and access rules.
 Example: Create a "Reward Token" template with properties like points, expiry_date, and redeemable status.`,
     inputSchema: {
-      name: z.string().min(1).describe("Template name (e.g. 'Reward Token', 'Digital Product Passport')"),
+      name: z.string().min(1).max(200).describe("Template name (e.g. 'Reward Token', 'Digital Product Passport')"),
       fqdn: z.string().optional().describe("Fully qualified domain name"),
-      object: z.record(z.unknown()).describe("Properties schema defining the object structure (JSON object)"),
+      object: boundedJsonObject().describe("Properties schema defining the object structure (JSON object)"),
       actions: z.array(z.string()).optional().describe("List of action type names allowed on objects of this template"),
       public_access: z.boolean().optional().describe("Whether objects are publicly accessible without auth"),
     },
@@ -59,8 +59,8 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     description: "Update a template's name, property schema, or access rules.",
     inputSchema: {
       template_id: IdParam,
-      name: z.string().optional().describe("New name"),
-      object: z.record(z.unknown()).optional().describe("Updated properties schema"),
+      name: z.string().min(1).max(200).optional().describe("New name"),
+      object: boundedJsonObject().optional().describe("Updated properties schema"),
       public_access: z.boolean().optional().describe("Updated public access setting"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -101,8 +101,8 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     description: "Create a variation of an existing template with overridden properties.",
     inputSchema: {
       template_id: IdParam,
-      name: z.string().describe("Variation name"),
-      object: z.record(z.unknown()).describe("Variation-specific property overrides"),
+      name: z.string().min(1).max(200).describe("Variation name"),
+      object: boundedJsonObject().describe("Variation-specific property overrides"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {

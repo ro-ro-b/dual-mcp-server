@@ -3,6 +3,7 @@ import { z } from "zod";
 import { makeApiRequest, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { IdParam } from "../schemas/common.js";
+import { assertExternalUrl } from "../services/security.js";
 
 export function registerWebhookTools(server: McpServer): void {
 
@@ -27,7 +28,7 @@ export function registerWebhookTools(server: McpServer): void {
     title: "Create Webhook",
     description: "Register a webhook to receive real-time notifications when events occur on the platform.",
     inputSchema: {
-      url: z.string().url().describe("HTTPS endpoint to receive webhook payloads"),
+      url: z.string().url().max(2048).describe("HTTPS endpoint to receive webhook payloads"),
       type: z.string().describe("Event type to subscribe to"),
       template_id: z.string().optional().describe("Scope to a specific template"),
       action: z.string().optional().describe("Scope to a specific action type"),
@@ -36,6 +37,7 @@ export function registerWebhookTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
+      assertExternalUrl(params.url);
       const res = await makeApiRequest<Record<string, unknown>>("webhooks", "POST", params);
       return textResult(`Webhook created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -58,13 +60,14 @@ export function registerWebhookTools(server: McpServer): void {
     description: "Update a webhook's URL or active status.",
     inputSchema: {
       webhook_id: IdParam,
-      url: z.string().url().optional().describe("New endpoint URL"),
+      url: z.string().url().max(2048).optional().describe("New endpoint URL"),
       is_active: z.boolean().optional().describe("Enable/disable the webhook"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
       const { webhook_id, ...body } = params;
+      if (body.url) assertExternalUrl(body.url);
       const res = await makeApiRequest<Record<string, unknown>>(`webhooks/${webhook_id}`, "PATCH", body);
       return textResult(`Webhook updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }

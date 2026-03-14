@@ -10,7 +10,7 @@ export function registerOrganizationTools(server: McpServer): void {
     title: "List Organizations",
     description: "List all organizations the authenticated wallet belongs to. Supports pagination and role filtering.",
     inputSchema: {
-      role_name: z.string().optional().describe("Filter by role name"),
+      role_name: z.string().max(200).optional().describe("Filter by role name"),
       ...CursorPaginationSchema,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -25,10 +25,10 @@ export function registerOrganizationTools(server: McpServer): void {
     title: "Create Organization",
     description: "Create a new organization (multi-tenant workspace). Returns the org with its ID and FQDN.",
     inputSchema: {
-      name: z.string().min(1).describe("Organization name"),
+      name: z.string().min(1).max(200).describe("Organization name"),
       fqdn: z.string().optional().describe("Fully qualified domain name"),
-      description: z.string().optional().describe("Organization description"),
-      image: z.string().optional().describe("Organization logo URL"),
+      description: z.string().max(5000).optional().describe("Organization description"),
+      image: z.string().max(2048).optional().describe("Organization logo URL"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
@@ -55,9 +55,9 @@ export function registerOrganizationTools(server: McpServer): void {
     description: "Update an organization's name, description, or image.",
     inputSchema: {
       organization_id: IdParam,
-      name: z.string().optional().describe("New name"),
-      description: z.string().optional().describe("New description"),
-      image: z.string().optional().describe("New logo URL"),
+      name: z.string().min(1).max(200).optional().describe("New name"),
+      description: z.string().max(5000).optional().describe("New description"),
+      image: z.string().max(2048).optional().describe("New logo URL"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -97,8 +97,8 @@ export function registerOrganizationTools(server: McpServer): void {
     description: "Add a wallet as a member to an organization with a specific role.",
     inputSchema: {
       organization_id: IdParam,
-      wallet_id: z.string().describe("Wallet ID to add"),
-      role_id: z.string().describe("Role ID to assign"),
+      wallet_id: z.string().max(200).describe("Wallet ID to add"),
+      role_id: z.string().max(200).describe("Role ID to assign"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -114,7 +114,7 @@ export function registerOrganizationTools(server: McpServer): void {
     description: "Remove a member from an organization.",
     inputSchema: {
       organization_id: IdParam,
-      member_id: z.string().describe("Member ID to remove"),
+      member_id: z.string().max(200).describe("Member ID to remove"),
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -141,8 +141,8 @@ export function registerOrganizationTools(server: McpServer): void {
     description: "Create a new role with specific permissions for an organization.",
     inputSchema: {
       organization_id: IdParam,
-      name: z.string().describe("Role name"),
-      permissions: z.array(z.string()).describe("List of permission strings"),
+      name: z.string().max(200).describe("Role name"),
+      permissions: z.array(z.string().max(200)).describe("List of permission strings"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
