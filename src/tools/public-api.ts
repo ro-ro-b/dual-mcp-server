@@ -50,7 +50,7 @@ export function registerPublicApiTools(server: McpServer): void {
     title: "Search Public Objects",
     description: "Search publicly accessible objects. No authentication required.",
     inputSchema: {
-      filter: z.record(z.unknown()).describe("Search filter criteria"),
+      filter: z.record(z.string(), z.unknown()).describe("Search filter criteria"),
       limit: z.number().int().min(1).max(100).default(20).optional().describe("Max results"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },

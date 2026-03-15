@@ -15,7 +15,7 @@ The action_type must match a registered action type, and the object must belong 
     inputSchema: {
       action_type: z.string().max(200).describe("Action type name (e.g. 'Transfer', 'Redeem', 'Mint')"),
       object_id: z.string().max(200).describe("Target object ID"),
-      payload: z.record(z.unknown()).optional().describe("Action payload data (depends on action type schema)"),
+      payload: z.record(z.string(), z.unknown()).optional().describe("Action payload data (depends on action type schema)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
@@ -33,7 +33,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
       actions: z.array(z.object({
         action_type: z.string().max(200).describe("Action type name"),
         object_id: z.string().max(200).describe("Target object ID"),
-        payload: z.record(z.unknown()).optional().describe("Action payload"),
+        payload: z.record(z.string(), z.unknown()).optional().describe("Action payload"),
       })).min(1).max(50).describe("Array of actions to execute atomically (1-50)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -98,7 +98,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     inputSchema: {
       name: z.string().max(200).describe("Action type name (e.g. 'Transfer', 'Redeem', 'UpdateStatus')"),
       description: z.string().max(5000).optional().describe("Human-readable description"),
-      schema: z.record(z.unknown()).optional().describe("JSON Schema for validating action payloads"),
+      schema: z.record(z.string(), z.unknown()).optional().describe("JSON Schema for validating action payloads"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
@@ -115,7 +115,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
       action_type_id: IdParam,
       name: z.string().max(200).optional().describe("New name"),
       description: z.string().max(5000).optional().describe("New description"),
-      schema: z.record(z.unknown()).optional().describe("Updated JSON Schema"),
+      schema: z.record(z.string(), z.unknown()).optional().describe("Updated JSON Schema"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {

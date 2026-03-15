@@ -37,6 +37,11 @@ import { registerPaymentTools } from "./tools/payments.js";
 import { registerSupportTools } from "./tools/support.js";
 import { registerPublicApiTools } from "./tools/public-api.js";
 
+// AI Service tool modules
+import { registerIntelligenceTools } from "./tools/intelligence.js";
+import { registerGovernanceTools } from "./tools/governance.js";
+import { registerCreativeTools } from "./tools/creative.js";
+
 // Create the MCP server
 const server = new McpServer({
   name: "dual-mcp-server",
@@ -58,6 +63,11 @@ registerApiKeyTools(server);
 registerPaymentTools(server);
 registerSupportTools(server);
 registerPublicApiTools(server);
+
+// AI Services
+registerIntelligenceTools(server);
+registerGovernanceTools(server);
+registerCreativeTools(server);
 
 // --- Transport ---
 

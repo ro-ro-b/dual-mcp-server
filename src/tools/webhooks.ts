@@ -90,7 +90,7 @@ export function registerWebhookTools(server: McpServer): void {
     description: "Send a test payload to a webhook endpoint to verify it's working.",
     inputSchema: {
       webhook_id: IdParam,
-      payload: z.record(z.unknown()).optional().describe("Custom test payload (optional)"),
+      payload: z.record(z.string(), z.unknown()).optional().describe("Custom test payload (optional)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {

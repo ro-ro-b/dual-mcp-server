@@ -44,7 +44,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     description: "Update the properties of a tokenized object. Only mutable properties can be changed.",
     inputSchema: {
       object_id: IdParam,
-      properties: z.record(z.unknown()).describe("Properties to update (key-value pairs)"),
+      properties: z.record(z.string(), z.unknown()).describe("Properties to update (key-value pairs)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
@@ -98,8 +98,8 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     description: `Search tokenized objects with filter criteria. Supports complex queries across all object properties.
 Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     inputSchema: {
-      filter: z.record(z.unknown()).describe("Search filter criteria (key-value pairs)"),
-      sort: z.record(z.unknown()).optional().describe("Sort criteria"),
+      filter: z.record(z.string(), z.unknown()).describe("Search filter criteria (key-value pairs)"),
+      sort: z.record(z.string(), z.unknown()).optional().describe("Sort criteria"),
       limit: z.number().int().min(1).max(100).default(20).optional().describe("Max results"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -115,7 +115,7 @@ Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     title: "Count Objects",
     description: "Count objects matching filter criteria without returning the full objects.",
     inputSchema: {
-      filter: z.record(z.unknown()).describe("Filter criteria (same as search)"),
+      filter: z.record(z.string(), z.unknown()).describe("Filter criteria (same as search)"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {

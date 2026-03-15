@@ -16,13 +16,20 @@
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["mcp", "dual", "tokenization", "web3", "blockchain", "ai"],
+  "keywords": [
+    "mcp",
+    "dual",
+    "tokenization",
+    "web3",
+    "blockchain",
+    "ai"
+  ],
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.6.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "axios": "1.7.9",
     "express": "4.21.0",
-    "zod": "3.23.8"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/express": "5.0.0",

@@ -32,7 +32,7 @@ export const UrlString = z.string().url().max(2048);
 export const ShortString = z.string().max(500);
 
 /** Safe filter schema that rejects NoSQL operators (H7) */
-export const SafeFilterSchema = z.record(z.unknown()).refine(
+export const SafeFilterSchema = z.record(z.string(), z.unknown()).refine(
   (obj) => !hasOperatorKeys(obj),
   "Filter keys starting with '$' are not allowed"
 ).refine(
@@ -56,7 +56,7 @@ export function boundedJsonObject(options?: { maxDepth?: number; maxSize?: numbe
   const maxDepth = options?.maxDepth ?? 5;
   const maxSize = options?.maxSize ?? 50000;
 
-  return z.record(z.unknown())
+  return z.record(z.string(), z.unknown())
     .refine(
       (obj) => JSON.stringify(obj).length <= maxSize,
       `JSON object too large (max ${Math.round(maxSize / 1024)}KB)`

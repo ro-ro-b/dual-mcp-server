@@ -26,7 +26,7 @@ export function registerNotificationTools(server: McpServer): void {
       template_id: z.string().max(200).describe("Message template ID"),
       subject: z.string().max(500).optional().describe("Override template subject"),
       body: z.string().max(5000).optional().describe("Override template body"),
-      data: z.record(z.unknown()).optional().describe("Template variable substitutions"),
+      data: z.record(z.string(), z.unknown()).optional().describe("Template variable substitutions"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
