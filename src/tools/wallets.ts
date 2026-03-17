@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError, setAuth } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult, formatDate } from "../services/formatters.js";
 
-export function registerWalletTools(server: McpServer): void {
+export function registerWalletTools(server: McpServer, api: ApiClient): void {
 
   // --- LOGIN ---
   server.registerTool("dual_login", {
@@ -21,10 +21,10 @@ export function registerWalletTools(server: McpServer): void {
       if (!params.email && !params.phone_number) {
         return errorResult("Error: Either email or phone_number is required for login.");
       }
-      const res = await makeApiRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
+      const res = await api.makeRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
         "wallets/login", "POST", params
       );
-      setAuth(res.access_token, res.refresh_token);
+      api.setAuth(res.access_token, res.refresh_token);
       return textResult(`Logged in as ${res.wallet.nickname || res.wallet.email || res.wallet.id}. Session authenticated.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -39,12 +39,23 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
+      const res = await api.makeRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
         "wallets/login/guest", "POST", params
       );
-      setAuth(res.access_token, res.refresh_token);
+      api.setAuth(res.access_token, res.refresh_token);
       return textResult(`Guest session created as ${res.wallet.nickname || "anonymous"}. Limited permissions apply.`);
     } catch (e) { return errorResult(handleApiError(e)); }
+  });
+
+  // --- LOGOUT (M3) ---
+  server.registerTool("dual_logout", {
+    title: "Logout",
+    description: "Clear all authentication state for this session. You will need to log in again or set credentials to make authenticated API calls.",
+    inputSchema: {},
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => {
+    api.clearAuth();
+    return textResult("Logged out. All credentials cleared for this session.");
   });
 
   // --- REGISTER ---
@@ -63,7 +74,7 @@ export function registerWalletTools(server: McpServer): void {
       if (!params.email && !params.phone_number) {
         return errorResult("Error: Either email or phone_number is required for registration.");
       }
-      await makeApiRequest("wallets/register", "POST", params);
+      await api.makeRequest("wallets/register", "POST", params);
       return textResult("Registration initiated. A verification code has been sent — use dual_register_verify to complete.");
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -78,10 +89,10 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
+      const res = await api.makeRequest<{ wallet: Record<string, unknown>; access_token: string; refresh_token: string }>(
         "wallets/register/verify", "POST", params
       );
-      setAuth(res.access_token, res.refresh_token);
+      api.setAuth(res.access_token, res.refresh_token);
       return textResult(`Registration complete. Logged in as ${res.wallet.nickname || res.wallet.id}.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -96,10 +107,10 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ access_token: string; refresh_token: string }>(
+      const res = await api.makeRequest<{ access_token: string; refresh_token: string }>(
         "wallets/token/refresh", "POST", params
       );
-      setAuth(res.access_token, res.refresh_token);
+      api.setAuth(res.access_token, res.refresh_token);
       return textResult("Token refreshed. Session re-authenticated.");
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -112,7 +123,7 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async () => {
     try {
-      const w = await makeApiRequest<Record<string, unknown>>("wallets/me");
+      const w = await api.makeRequest<Record<string, unknown>>("wallets/me");
       return textResult(JSON.stringify(w, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -129,7 +140,7 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const w = await makeApiRequest<Record<string, unknown>>("wallets/me", "PATCH", params);
+      const w = await api.makeRequest<Record<string, unknown>>("wallets/me", "PATCH", params);
       return textResult(`Wallet updated.\n${JSON.stringify(w, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -144,7 +155,7 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const w = await makeApiRequest<Record<string, unknown>>(`wallets/${params.wallet_id}`);
+      const w = await api.makeRequest<Record<string, unknown>>(`wallets/${params.wallet_id}`);
       return textResult(JSON.stringify(w, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -163,7 +174,7 @@ export function registerWalletTools(server: McpServer): void {
       if (!params.email && !params.phone_number) {
         return errorResult("Error: Either email or phone_number is required for password reset.");
       }
-      await makeApiRequest("wallets/reset-code", "POST", params);
+      await api.makeRequest("wallets/reset-code", "POST", params);
       return textResult("Reset code sent. Use dual_reset_password_verify with the code and new password.");
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -179,7 +190,7 @@ export function registerWalletTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest("wallets/reset-code/verify", "POST", params);
+      await api.makeRequest("wallets/reset-code/verify", "POST", params);
       return textResult("Password reset successful. You can now log in with the new password.");
     } catch (e) { return errorResult(handleApiError(e)); }
   });

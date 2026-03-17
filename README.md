@@ -6,12 +6,14 @@ This MCP server enables AI agents to interact directly with the DUAL Web3 Operat
 
 ## Features
 
-- **60+ tools** across 14 API modules
+- **115 tools** across 17 API modules
 - **Full CRUD** for wallets, organizations, templates, objects, faces, webhooks, notifications, and API keys
 - **Event Bus** — execute actions and batch operations atomically
 - **Sequencer & ZK-Rollup** — query batches and checkpoints
+- **AI Services** — intelligence (agents, predictions, knowledge graph), governance (compliance, provenance), creative (token design, face templates)
 - **Public API** — read-only access without authentication
 - **Dual transport** — stdio for local use, HTTP for remote deployment
+- **Session-isolated HTTP** — each HTTP request gets its own auth context
 
 ## Quick Start
 
@@ -43,7 +45,8 @@ export DUAL_ACCESS_TOKEN=your-jwt-token
 node dist/index.js
 
 # HTTP transport (for remote/multi-client)
-TRANSPORT=http PORT=3100 node dist/index.js
+# MCP_SERVER_API_KEY is REQUIRED for HTTP mode
+MCP_SERVER_API_KEY=your-secret TRANSPORT=http PORT=3100 node dist/index.js
 ```
 
 ### Claude Desktop Configuration
@@ -66,9 +69,11 @@ Add to your `claude_desktop_config.json`:
 
 ## API Modules & Tools
 
+### Core DUAL API (80 tools)
+
 | Module | Tools | Description |
 |--------|-------|-------------|
-| **Wallets** | 10 | Authentication, registration, profile management |
+| **Wallets** | 11 | Authentication, registration, profile management, logout |
 | **Organizations** | 10 | Multi-tenant workspaces, members, roles |
 | **Templates** | 7 | Token template CRUD, variations |
 | **Objects** | 8 | Tokenized asset instances, search, hierarchy |
@@ -82,6 +87,16 @@ Add to your `claude_desktop_config.json`:
 | **Payments** | 2 | Payment config, deposit history |
 | **Support** | 3 | Feature access requests, support messages |
 | **Public API** | 5 | Read-only public endpoints (no auth) |
+
+### AI Services (34 tools)
+
+These tools require the DUAL AI microservices running alongside the server. See [AI Service Dependencies](#ai-service-dependencies) below.
+
+| Module | Tools | Description |
+|--------|-------|-------------|
+| **Intelligence** | 12 | Autonomous agents, lifecycle predictions, trending, anomalies, knowledge graph |
+| **Governance** | 14 | Compliance rules & evaluation, audit log, policy parsing, provenance verification |
+| **Creative** | 8 | Token design generation, face templates, SVG rendering |
 
 ## Example Usage
 
@@ -106,27 +121,43 @@ The AI agent uses:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DUAL_API_KEY` | API key for authentication | One of these |
+| `DUAL_API_KEY` | API key for DUAL platform authentication | One of these |
 | `DUAL_ACCESS_TOKEN` | JWT access token | One of these |
-| `DUAL_REFRESH_TOKEN` | JWT refresh token | Optional |
+| `DUAL_REFRESH_TOKEN` | JWT refresh token | No |
 | `DUAL_API_URL` | API base URL (default: `https://api.blockv-labs.io/v3`) | No |
 | `TRANSPORT` | `stdio` (default) or `http` | No |
-| `PORT` | HTTP port (default: 3100) | No |
+| `PORT` | HTTP port (default: `3100`) | No |
+| `HOST` | HTTP bind address (default: `127.0.0.1`) | No |
+| `MCP_SERVER_API_KEY` | Shared secret for HTTP endpoint auth | **Yes** (HTTP mode) |
+| `CORS_ORIGIN` | Comma-separated allowed origins (e.g. `https://app.example.com`) | No |
+| `RATE_LIMIT_MAX` | Max requests per minute per IP (default: `100`) | No |
+
+### AI Service Dependencies
+
+The intelligence, governance, and creative tool modules connect to separate DUAL AI microservices. If these services are not running, those 34 tools will return connection errors; the remaining 81 core tools are unaffected.
+
+| Variable | Default | Service |
+|----------|---------|---------|
+| `INTELLIGENCE_URL` | `http://localhost:3201` | Intelligence (agents, predictions, graph) |
+| `GOVERNANCE_URL` | `http://localhost:3202` | Governance (compliance, provenance, policies) |
+| `CREATIVE_URL` | `http://localhost:3203` | Creative (token design, face rendering) |
 
 ## Architecture
 
 ```
 dual-mcp-server/
 ├── src/
-│   ├── index.ts              # Server initialization & transport
-│   ├── constants.ts          # API URL, limits
+│   ├── index.ts              # Server factory, transport setup (stdio + HTTP)
+│   ├── constants.ts          # API URL, limits, MCP_SERVER_API_KEY
 │   ├── schemas/
-│   │   └── common.ts         # Shared Zod schemas (pagination, IDs)
+│   │   └── common.ts         # Shared Zod schemas (pagination, IDs, filters)
 │   ├── services/
-│   │   ├── api-client.ts     # HTTP client, auth, error handling
+│   │   ├── api-client.ts     # ApiClient class (per-session auth + HTTP requests)
+│   │   ├── ai-client.ts      # HTTP client for AI microservices
+│   │   ├── security.ts       # SSRF, NoSQL injection, input validation
 │   │   └── formatters.ts     # Response formatting, truncation
 │   └── tools/
-│       ├── wallets.ts        # 10 wallet tools
+│       ├── wallets.ts        # 11 wallet tools (incl. login, logout)
 │       ├── organizations.ts  # 10 organization tools
 │       ├── templates.ts      # 7 template tools
 │       ├── objects.ts        # 8 object tools
@@ -139,9 +170,25 @@ dual-mcp-server/
 │       ├── api-keys.ts       # 3 API key tools
 │       ├── payments.ts       # 2 payment tools
 │       ├── support.ts        # 3 support tools
-│       └── public-api.ts     # 5 public API tools
+│       ├── public-api.ts     # 5 public API tools
+│       ├── intelligence.ts   # 12 intelligence tools
+│       ├── governance.ts     # 14 governance tools
+│       └── creative.ts       # 8 creative tools
+├── SECURITY.md               # Security policy & reporting
 └── dist/                     # Compiled JavaScript
 ```
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the security policy, threat model, and how to report vulnerabilities.
+
+Key security features:
+- **Session isolation**: HTTP mode creates a fresh server + auth context per request
+- **SSRF protection**: External URL validation blocks private networks and cloud metadata
+- **NoSQL injection prevention**: Filter schemas reject `$`-operator keys
+- **Input validation**: Zod schemas with size/depth limits on all tool inputs
+- **Rate limiting**: Per-IP rate limiting with configurable max
+- **Security headers**: X-Content-Type-Options, CSP, HSTS, X-Frame-Options
 
 ## License
 

@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { IdParam } from "../schemas/common.js";
 import { assertExternalUrl } from "../services/security.js";
 
-export function registerWebhookTools(server: McpServer): void {
+export function registerWebhookTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_webhooks", {
     title: "List Webhooks",
@@ -19,7 +19,7 @@ export function registerWebhookTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("webhooks", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("webhooks", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -38,7 +38,7 @@ export function registerWebhookTools(server: McpServer): void {
   }, async (params) => {
     try {
       assertExternalUrl(params.url);
-      const res = await makeApiRequest<Record<string, unknown>>("webhooks", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("webhooks", "POST", params);
       return textResult(`Webhook created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -50,7 +50,7 @@ export function registerWebhookTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`webhooks/${params.webhook_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`webhooks/${params.webhook_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -68,7 +68,7 @@ export function registerWebhookTools(server: McpServer): void {
     try {
       const { webhook_id, ...body } = params;
       if (body.url) assertExternalUrl(body.url);
-      const res = await makeApiRequest<Record<string, unknown>>(`webhooks/${webhook_id}`, "PATCH", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`webhooks/${webhook_id}`, "PATCH", body);
       return textResult(`Webhook updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -80,7 +80,7 @@ export function registerWebhookTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`webhooks/${params.webhook_id}`, "DELETE");
+      await api.makeRequest(`webhooks/${params.webhook_id}`, "DELETE");
       return textResult(`Webhook ${params.webhook_id} deleted.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -96,7 +96,7 @@ export function registerWebhookTools(server: McpServer): void {
   }, async (params) => {
     try {
       const { webhook_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`webhooks/${webhook_id}/test`, "POST", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`webhooks/${webhook_id}/test`, "POST", body);
       return textResult(`Webhook test sent.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

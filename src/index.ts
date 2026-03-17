@@ -3,9 +3,10 @@
  * DUAL MCP Server
  *
  * AI-native integration with the DUAL tokenization platform.
- * Provides 60+ tools across 14 API modules: wallets, organizations, templates,
+ * Provides 115 tools across 17 API modules: wallets, organizations, templates,
  * objects, actions (Event Bus), faces, storage, webhooks, notifications,
- * sequencer, API keys, payments, support, and the public indexer API.
+ * sequencer, API keys, payments, support, public indexer API, plus AI service
+ * modules for intelligence, governance, and creative.
  *
  * Authentication:
  *   - Set DUAL_ACCESS_TOKEN (JWT) or DUAL_API_KEY environment variable
@@ -14,12 +15,14 @@
  * Transport:
  *   - stdio (default): For local integrations with Claude, Cursor, etc.
  *   - http: Set TRANSPORT=http for remote/multi-client use
- *     - Set MCP_SERVER_API_KEY to protect the HTTP endpoint (REQUIRED)
+ *     - MCP_SERVER_API_KEY is REQUIRED for HTTP mode
+ *     - Binds to 127.0.0.1 by default (set HOST to override)
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { MCP_SERVER_API_KEY } from "./constants.js";
+import { ApiClient } from "./services/api-client.js";
 
 // Tool registration modules
 import { registerWalletTools } from "./tools/wallets.js";
@@ -42,36 +45,46 @@ import { registerIntelligenceTools } from "./tools/intelligence.js";
 import { registerGovernanceTools } from "./tools/governance.js";
 import { registerCreativeTools } from "./tools/creative.js";
 
-// Create the MCP server
-const server = new McpServer({
-  name: "dual-mcp-server",
-  version: "1.0.0",
-});
+/**
+ * Create a fully-configured McpServer with its own ApiClient.
+ * Stdio mode calls this once; HTTP mode calls it per request
+ * so each connection gets isolated auth state.
+ */
+function createServer(apiClient?: ApiClient): { server: McpServer; api: ApiClient } {
+  const api = apiClient ?? new ApiClient();
+  const server = new McpServer({
+    name: "dual-mcp-server",
+    version: "0.1.0",
+  });
 
-// Register all tool modules
-registerWalletTools(server);
-registerOrganizationTools(server);
-registerTemplateTools(server);
-registerObjectTools(server);
-registerActionTools(server);
-registerFaceTools(server);
-registerStorageTools(server);
-registerWebhookTools(server);
-registerNotificationTools(server);
-registerSequencerTools(server);
-registerApiKeyTools(server);
-registerPaymentTools(server);
-registerSupportTools(server);
-registerPublicApiTools(server);
+  // Core DUAL API modules
+  registerWalletTools(server, api);
+  registerOrganizationTools(server, api);
+  registerTemplateTools(server, api);
+  registerObjectTools(server, api);
+  registerActionTools(server, api);
+  registerFaceTools(server, api);
+  registerStorageTools(server, api);
+  registerWebhookTools(server, api);
+  registerNotificationTools(server, api);
+  registerSequencerTools(server, api);
+  registerApiKeyTools(server, api);
+  registerPaymentTools(server, api);
+  registerSupportTools(server, api);
+  registerPublicApiTools(server, api);
 
-// AI Services
-registerIntelligenceTools(server);
-registerGovernanceTools(server);
-registerCreativeTools(server);
+  // AI Service modules
+  registerIntelligenceTools(server, api);
+  registerGovernanceTools(server, api);
+  registerCreativeTools(server, api);
 
-// --- Transport ---
+  return { server, api };
+}
+
+// --- Transport: stdio ---
 
 async function runStdio(): Promise<void> {
+  const { server } = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("DUAL MCP server running via stdio");
@@ -79,42 +92,68 @@ async function runStdio(): Promise<void> {
   console.error(`Auth: ${process.env.DUAL_API_KEY ? "API Key" : process.env.DUAL_ACCESS_TOKEN ? "JWT Token" : "None (use dual_login)"}`);
 }
 
+// --- Transport: HTTP (streamable) ---
+
 async function runHTTP(): Promise<void> {
-  // Dynamic import for HTTP transport (only loaded when needed)
+  // H1: Require MCP_SERVER_API_KEY in HTTP mode
+  if (!MCP_SERVER_API_KEY) {
+    console.error("ERROR: MCP_SERVER_API_KEY is required when running in HTTP mode.");
+    console.error("Set MCP_SERVER_API_KEY to a strong random string to protect the endpoint.");
+    process.exit(1);
+  }
+
   const { default: express } = await import("express");
-  const { StreamableHTTPServerTransport } = await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
+  const { StreamableHTTPServerTransport } = await import(
+    "@modelcontextprotocol/sdk/server/streamableHttp.js"
+  );
+  const { randomUUID } = await import("crypto");
 
   const app = express();
 
-  // --- H1: Security middleware ---
-  // Body size limit (prevents DoS via large payloads)
+  // ── Security middleware ──────────────────────────────────────
+
+  // Body size limit (DoS prevention)
   app.use(express.json({ limit: "1mb" }));
 
-  // Security headers (subset of helmet, inline to avoid extra dependency)
+  // Security headers
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("X-XSS-Protection", "0"); // modern approach: rely on CSP
+    res.setHeader("X-XSS-Protection", "0");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("Content-Security-Policy", "default-src 'none'");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     next();
   });
 
-  // CORS: deny all by default (server-to-server use)
-  app.use((_req, res, next) => {
-    const allowedOrigin = process.env.CORS_ORIGIN;
-    if (allowedOrigin) {
-      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  // C3: Origin validation (DNS-rebinding defense)
+  const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+    : [];
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    // If CORS_ORIGIN is configured, set CORS headers for allowed origins
+    if (ALLOWED_ORIGINS.length > 0 && origin && ALLOWED_ORIGINS.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
     }
+
+    // Block requests with an Origin header that isn't in the allowlist
+    // (no Origin header = server-to-server, which is OK)
+    if (origin && ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(origin)) {
+      res.status(403).json({ error: "Origin not allowed." });
+      return;
+    }
+
     next();
   });
 
-  // Rate limiting (simple in-memory, H1)
+  // Rate limiting (in-memory)
   const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-  const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+  const RATE_LIMIT_WINDOW = 60_000;
   const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || "100");
 
   app.use((req, res, next) => {
@@ -135,7 +174,7 @@ async function runHTTP(): Promise<void> {
     next();
   });
 
-  // Periodic cleanup of rate limit map
+  // Periodic cleanup
   setInterval(() => {
     const now = Date.now();
     for (const [key, val] of rateLimitMap) {
@@ -143,28 +182,35 @@ async function runHTTP(): Promise<void> {
     }
   }, RATE_LIMIT_WINDOW);
 
-  // --- C1: Authentication middleware ---
-  function authMiddleware(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction): void {
-    // Skip auth if no server key is configured (dev mode)
-    if (!MCP_SERVER_API_KEY) {
-      console.error("WARNING: MCP_SERVER_API_KEY not set — HTTP endpoint is UNPROTECTED");
-      return next();
-    }
+  // ── Authentication middleware ────────────────────────────────
 
+  function authMiddleware(
+    req: import("express").Request,
+    res: import("express").Response,
+    next: import("express").NextFunction,
+  ): void {
     const providedKey =
       (req.headers["x-api-key"] as string | undefined) ??
-      (req.headers["authorization"]?.startsWith("Bearer ") ? req.headers["authorization"].slice(7) : undefined);
+      (req.headers["authorization"]?.startsWith("Bearer ")
+        ? req.headers["authorization"].slice(7)
+        : undefined);
 
     if (!providedKey || providedKey !== MCP_SERVER_API_KEY) {
-      res.status(401).json({ error: "Unauthorized. Provide a valid X-API-Key or Authorization: Bearer <key> header." });
+      res
+        .status(401)
+        .json({ error: "Unauthorized. Provide a valid X-API-Key or Authorization: Bearer <key> header." });
       return;
     }
     next();
   }
 
+  // ── MCP endpoint ────────────────────────────────────────────
+
+  // M1: Fresh server + ApiClient per HTTP request (session isolation)
   app.post("/mcp", authMiddleware, async (req, res) => {
+    const { server } = createServer();
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: () => randomUUID(),
       enableJsonResponse: true,
     });
     res.on("close", () => transport.close());
@@ -172,27 +218,48 @@ async function runHTTP(): Promise<void> {
     await transport.handleRequest(req, res, req.body);
   });
 
-  // M9: Health check — minimal info disclosure
+  // C2: GET on /mcp — 405 Method Not Allowed (SSE not yet supported)
+  app.get("/mcp", (_req, res) => {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ error: "Method Not Allowed. Use POST for JSON-RPC requests." });
+  });
+
+  // DELETE on /mcp — 405
+  app.delete("/mcp", (_req, res) => {
+    res.setHeader("Allow", "POST");
+    res.status(405).json({ error: "Method Not Allowed. Use POST for JSON-RPC requests." });
+  });
+
+  // Health check (minimal info disclosure)
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
 
-  // M8: Port validation
+  // ── Listen ──────────────────────────────────────────────────
+
   const rawPort = parseInt(process.env.PORT || "3100");
   const port = Number.isNaN(rawPort) ? 3100 : Math.max(1, Math.min(65535, rawPort));
 
-  app.listen(port, () => {
-    console.error(`DUAL MCP server running on http://localhost:${port}/mcp`);
-    if (!MCP_SERVER_API_KEY) {
-      console.error("⚠️  WARNING: Set MCP_SERVER_API_KEY to protect the HTTP endpoint!");
-    }
+  // C4: Bind to 127.0.0.1 by default (localhost only)
+  const host = process.env.HOST || "127.0.0.1";
+
+  app.listen(port, host, () => {
+    console.error(`DUAL MCP server running on http://${host}:${port}/mcp`);
+    console.error("HTTP mode: session-isolated, auth required");
   });
 }
 
-// Launch
+// ── Launch ──────────────────────────────────────────────────────
+
 const transport = process.env.TRANSPORT || "stdio";
 if (transport === "http") {
-  runHTTP().catch((err) => { console.error("Server error:", err); process.exit(1); });
+  runHTTP().catch((err) => {
+    console.error("Server error:", err);
+    process.exit(1);
+  });
 } else {
-  runStdio().catch((err) => { console.error("Server error:", err); process.exit(1); });
+  runStdio().catch((err) => {
+    console.error("Server error:", err);
+    process.exit(1);
+  });
 }

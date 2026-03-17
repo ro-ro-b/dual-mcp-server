@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 
-export function registerSupportTools(server: McpServer): void {
+export function registerSupportTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_request_access", {
     title: "Request Feature Access",
@@ -16,7 +16,7 @@ export function registerSupportTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest("support/request-access", "POST", params);
+      await api.makeRequest("support/request-access", "POST", params);
       return textResult(`Access requested for feature: ${params.feature}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -32,7 +32,7 @@ export function registerSupportTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("support", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("support", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -48,7 +48,7 @@ export function registerSupportTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("support", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("support", "POST", params);
       return textResult(`Support message sent.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

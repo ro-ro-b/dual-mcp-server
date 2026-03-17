@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 import { assertNoOperatorKeys } from "../services/security.js";
 
-export function registerPublicApiTools(server: McpServer): void {
+export function registerPublicApiTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_public_list_templates", {
     title: "List Public Templates",
@@ -17,7 +17,7 @@ export function registerPublicApiTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("public/templates", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("public/templates", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -29,7 +29,7 @@ export function registerPublicApiTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`public/templates/${params.template_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`public/templates/${params.template_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -41,7 +41,7 @@ export function registerPublicApiTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`public/objects/${params.object_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`public/objects/${params.object_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -57,7 +57,7 @@ export function registerPublicApiTools(server: McpServer): void {
   }, async (params) => {
     try {
       assertNoOperatorKeys(params.filter);
-      const res = await makeApiRequest<unknown>("public/objects/search", "POST", params);
+      const res = await api.makeRequest<unknown>("public/objects/search", "POST", params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -69,7 +69,7 @@ export function registerPublicApiTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async () => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("public/stats");
+      const res = await api.makeRequest<Record<string, unknown>>("public/stats");
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });

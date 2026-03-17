@@ -1,11 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
-import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
-import { assertNoOperatorKeys } from "../services/security.js";
+import { CursorPaginationSchema, IdParam, SafeFilterSchema } from "../schemas/common.js";
 
-export function registerObjectTools(server: McpServer): void {
+export function registerObjectTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_objects", {
     title: "List Objects",
@@ -22,7 +21,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[]; next?: string }>("objects", "GET", undefined, params);
+      const res = await api.makeRequest<{ items: unknown[]; next?: string }>("objects", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -34,7 +33,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`objects/${params.object_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`objects/${params.object_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -49,7 +48,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`objects/${params.object_id}`, "PATCH", { properties: params.properties });
+      const res = await api.makeRequest<Record<string, unknown>>(`objects/${params.object_id}`, "PATCH", { properties: params.properties });
       return textResult(`Object updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -61,7 +60,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>(`objects/${params.object_id}/children`);
+      const res = await api.makeRequest<unknown>(`objects/${params.object_id}/children`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -73,7 +72,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>(`objects/${params.object_id}/parents`);
+      const res = await api.makeRequest<unknown>(`objects/${params.object_id}/parents`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -88,7 +87,7 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>(`objects/${params.object_id}/activity`, "GET", undefined, { limit: params.limit });
+      const res = await api.makeRequest<unknown>(`objects/${params.object_id}/activity`, "GET", undefined, { limit: params.limit });
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -98,15 +97,14 @@ Filter by template, owner, FQDN, or geographic hash. Supports pagination.`,
     description: `Search tokenized objects with filter criteria. Supports complex queries across all object properties.
 Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     inputSchema: {
-      filter: z.record(z.string(), z.unknown()).describe("Search filter criteria (key-value pairs)"),
+      filter: SafeFilterSchema.describe("Search filter criteria (key-value pairs)"),
       sort: z.record(z.string(), z.unknown()).optional().describe("Sort criteria"),
       limit: z.number().int().min(1).max(100).default(20).optional().describe("Max results"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      assertNoOperatorKeys(params.filter);
-      const res = await makeApiRequest<unknown>("objects/search", "POST", params);
+      const res = await api.makeRequest<unknown>("objects/search", "POST", params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -115,13 +113,12 @@ Example filters: { "template_id": "abc123", "properties.status": "active" }`,
     title: "Count Objects",
     description: "Count objects matching filter criteria without returning the full objects.",
     inputSchema: {
-      filter: z.record(z.string(), z.unknown()).describe("Filter criteria (same as search)"),
+      filter: SafeFilterSchema.describe("Filter criteria (same as search)"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      assertNoOperatorKeys(params.filter);
-      const res = await makeApiRequest<{ count: number }>("objects/count", "POST", params);
+      const res = await api.makeRequest<{ count: number }>("objects/count", "POST", params);
       return textResult(`Count: ${res.count}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

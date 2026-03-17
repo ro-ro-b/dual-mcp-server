@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { ApiClient } from "../services/api-client.js";
 import { aiRequest } from "../services/ai-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 
-export function registerGovernanceTools(server: McpServer): void {
+export function registerGovernanceTools(server: McpServer, api: ApiClient): void {
 
   // --- COMPLIANCE ---
 

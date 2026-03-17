@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 
-export function registerSequencerTools(server: McpServer): void {
+export function registerSequencerTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_batches", {
     title: "List Sequencer Batches",
@@ -13,7 +13,7 @@ export function registerSequencerTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("batches", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("batches", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -25,7 +25,7 @@ export function registerSequencerTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`batches/${params.batch_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`batches/${params.batch_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -41,7 +41,7 @@ export function registerSequencerTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("checkpoints", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("checkpoints", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -53,7 +53,7 @@ export function registerSequencerTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`checkpoints/${params.checkpoint_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`checkpoints/${params.checkpoint_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });

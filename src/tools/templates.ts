@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam, boundedJsonObject } from "../schemas/common.js";
 
-export function registerTemplateTools(server: McpServer): void {
+export function registerTemplateTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_templates", {
     title: "List Templates",
@@ -17,7 +17,7 @@ export function registerTemplateTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[]; next?: string }>("templates", "GET", undefined, params);
+      const res = await api.makeRequest<{ items: unknown[]; next?: string }>("templates", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -37,7 +37,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("templates", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("templates", "POST", params);
       return textResult(`Template created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -49,7 +49,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`templates/${params.template_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`templates/${params.template_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -67,7 +67,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
   }, async (params) => {
     try {
       const { template_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`templates/${template_id}`, "PATCH", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`templates/${template_id}`, "PATCH", body);
       return textResult(`Template updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -79,7 +79,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`templates/${params.template_id}`, "DELETE");
+      await api.makeRequest(`templates/${params.template_id}`, "DELETE");
       return textResult(`Template ${params.template_id} deleted.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -91,7 +91,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>(`templates/${params.template_id}/variations`);
+      const res = await api.makeRequest<unknown>(`templates/${params.template_id}/variations`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -108,7 +108,7 @@ Example: Create a "Reward Token" template with properties like points, expiry_da
   }, async (params) => {
     try {
       const { template_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`templates/${template_id}/variations`, "POST", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`templates/${template_id}/variations`, "POST", body);
       return textResult(`Variation created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

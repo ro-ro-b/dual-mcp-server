@@ -2,104 +2,118 @@ import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import { API_BASE_URL, MAX_RESPONSE_SIZE } from "../constants.js";
 import { assertNoControlChars } from "./security.js";
 
-/** Auth state — supports both Bearer JWT and API Key */
-let authToken: string | undefined = process.env.DUAL_ACCESS_TOKEN;
-let apiKey: string | undefined = process.env.DUAL_API_KEY;
-let refreshToken: string | undefined = process.env.DUAL_REFRESH_TOKEN;
+/**
+ * Per-session API client. Encapsulates auth state so HTTP-mode sessions
+ * are fully isolated from each other.
+ *
+ * Stdio mode: one ApiClient for the process lifetime.
+ * HTTP mode:  one ApiClient per incoming request.
+ */
+export class ApiClient {
+  private authToken: string | undefined;
+  private apiKey: string | undefined;
+  private refreshToken: string | undefined;
 
-export function setAuth(token: string, refresh?: string): void {
-  // M10: Validate tokens don't contain control characters
-  assertNoControlChars(token, "Access token");
-  if (refresh) assertNoControlChars(refresh, "Refresh token");
-
-  authToken = token;
-  if (refresh) refreshToken = refresh;
-}
-
-export function setApiKey(key: string): void {
-  assertNoControlChars(key, "API key");
-  apiKey = key;
-}
-
-/** L2: Clear all auth state (logout) */
-export function clearAuth(): void {
-  authToken = undefined;
-  apiKey = undefined;
-  refreshToken = undefined;
-}
-
-export function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-  };
-  if (apiKey) {
-    headers["x-api-key"] = apiKey;
-  } else if (authToken) {
-    headers["Authorization"] = `Bearer ${authToken}`;
+  constructor() {
+    // Seed from environment (safe default for stdio)
+    this.authToken = process.env.DUAL_ACCESS_TOKEN;
+    this.apiKey = process.env.DUAL_API_KEY;
+    this.refreshToken = process.env.DUAL_REFRESH_TOKEN;
   }
-  return headers;
-}
 
-export function hasAuth(): boolean {
-  return !!(authToken || apiKey);
-}
+  /** Set JWT auth (from dual_login / dual_register_verify / dual_refresh_token) */
+  setAuth(token: string, refresh?: string): void {
+    assertNoControlChars(token, "Access token");
+    if (refresh) assertNoControlChars(refresh, "Refresh token");
+    this.authToken = token;
+    if (refresh) this.refreshToken = refresh;
+  }
 
-export function getRefreshToken(): string | undefined {
-  return refreshToken;
-}
+  /** Set API-key auth (from dual_set_api_key) */
+  setApiKey(key: string): void {
+    assertNoControlChars(key, "API key");
+    this.apiKey = key;
+  }
 
-/** Generic API request with error handling and retry for 429 (L1) */
-export async function makeApiRequest<T>(
-  endpoint: string,
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
-  data?: unknown,
-  params?: Record<string, unknown>,
-  options?: { timeout?: number; multipart?: boolean; retries?: number }
-): Promise<T> {
-  const maxRetries = options?.retries ?? 2;
+  /** Clear all auth state (logout) */
+  clearAuth(): void {
+    this.authToken = undefined;
+    this.apiKey = undefined;
+    this.refreshToken = undefined;
+  }
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const config: AxiosRequestConfig = {
-        method,
-        url: `${API_BASE_URL}/${endpoint}`,
-        headers: getAuthHeaders(),
-        timeout: options?.timeout ?? 30000,
-        // M2: Response size limits
-        maxContentLength: MAX_RESPONSE_SIZE,
-        maxBodyLength: MAX_RESPONSE_SIZE,
-      };
+  hasAuth(): boolean {
+    return !!(this.authToken || this.apiKey);
+  }
 
-      if (data !== undefined) config.data = data;
-      if (params) config.params = params;
-      if (options?.multipart) {
-        config.headers = { ...config.headers, "Content-Type": "multipart/form-data" };
-      }
+  getRefreshToken(): string | undefined {
+    return this.refreshToken;
+  }
 
-      const response = await axios(config);
-      return response.data as T;
-    } catch (error) {
-      // L1: Retry with exponential backoff on 429
-      if (
-        axios.isAxiosError(error) &&
-        error.response?.status === 429 &&
-        attempt < maxRetries
-      ) {
-        const retryAfter = parseInt(error.response.headers["retry-after"] || "0");
-        const delay = retryAfter > 0 ? retryAfter * 1000 : Math.pow(2, attempt) * 1000;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
-      }
-      throw error;
+  getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (this.apiKey) {
+      headers["x-api-key"] = this.apiKey;
+    } else if (this.authToken) {
+      headers["Authorization"] = `Bearer ${this.authToken}`;
     }
+    return headers;
   }
 
-  // Should never reach here, but TypeScript needs it
-  throw new Error("Max retries exceeded");
+  /** Generic API request with error handling and retry for 429 */
+  async makeRequest<T>(
+    endpoint: string,
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
+    data?: unknown,
+    params?: Record<string, unknown>,
+    options?: { timeout?: number; multipart?: boolean; retries?: number },
+  ): Promise<T> {
+    const maxRetries = options?.retries ?? 2;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const config: AxiosRequestConfig = {
+          method,
+          url: `${API_BASE_URL}/${endpoint}`,
+          headers: this.getAuthHeaders(),
+          timeout: options?.timeout ?? 30000,
+          maxContentLength: MAX_RESPONSE_SIZE,
+          maxBodyLength: MAX_RESPONSE_SIZE,
+        };
+
+        if (data !== undefined) config.data = data;
+        if (params) config.params = params;
+        if (options?.multipart) {
+          config.headers = { ...config.headers, "Content-Type": "multipart/form-data" };
+        }
+
+        const response = await axios(config);
+        return response.data as T;
+      } catch (error) {
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status === 429 &&
+          attempt < maxRetries
+        ) {
+          const retryAfter = parseInt(error.response.headers["retry-after"] || "0");
+          const delay = retryAfter > 0 ? retryAfter * 1000 : Math.pow(2, attempt) * 1000;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error("Max retries exceeded");
+  }
 }
 
-/** H2: Format API errors into safe, non-leaking messages */
+/* ─── Stateless helpers (no auth state) ─── */
+
+/** Format API errors into safe, non-leaking messages */
 const SAFE_ERROR_MESSAGES: Record<number, string> = {
   400: "Bad request — check your parameters",
   401: "Authentication required. Use dual_login or set DUAL_ACCESS_TOKEN / DUAL_API_KEY",
@@ -117,11 +131,9 @@ export function handleApiError(error: unknown): string {
       const status = axiosErr.response.status;
       const body = axiosErr.response.data;
 
-      // Log full error server-side for debugging
       const rawMsg = body?.error?.message || body?.message || "";
       console.error(`[DUAL API Error] ${status}: ${rawMsg}`);
 
-      // Return sanitized message to client
       const safeMsg = SAFE_ERROR_MESSAGES[status];
       if (safeMsg) return `Error: ${safeMsg}.`;
       return `Error: API request failed (${status}).`;

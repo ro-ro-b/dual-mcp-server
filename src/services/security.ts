@@ -43,28 +43,6 @@ export function assertExternalUrl(urlString: string): void {
   }
 }
 
-// --- JSON Depth & Size Validation (H8, M7) ---
-
-/** Validate JSON depth to prevent stack overflow from deeply nested payloads */
-export function validateJsonDepth(obj: unknown, maxDepth: number = 5, currentDepth: number = 0): boolean {
-  if (currentDepth > maxDepth) return false;
-  if (obj !== null && typeof obj === "object") {
-    return Object.values(obj as Record<string, unknown>).every(
-      (v) => validateJsonDepth(v, maxDepth, currentDepth + 1)
-    );
-  }
-  return true;
-}
-
-/** Validate JSON serialized size */
-export function validateJsonSize(obj: unknown, maxBytes: number = 50000): boolean {
-  try {
-    return JSON.stringify(obj).length <= maxBytes;
-  } catch {
-    return false;
-  }
-}
-
 // --- NoSQL Injection Prevention (H7) ---
 
 /** Check that filter object keys don't contain MongoDB-style operators */

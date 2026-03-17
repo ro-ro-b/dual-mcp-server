@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError, setApiKey } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { IdParam } from "../schemas/common.js";
 
-export function registerApiKeyTools(server: McpServer): void {
+export function registerApiKeyTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_api_keys", {
     title: "List API Keys",
@@ -13,7 +13,7 @@ export function registerApiKeyTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async () => {
     try {
-      const res = await makeApiRequest<{ items: unknown[] }>("api-keys");
+      const res = await api.makeRequest<{ items: unknown[] }>("api-keys");
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -28,7 +28,7 @@ export function registerApiKeyTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ id: string; key: string; name: string }>("api-keys", "POST", params);
+      const res = await api.makeRequest<{ id: string; key: string; name: string }>("api-keys", "POST", params);
       return textResult(`API Key created.\nName: ${res.name}\nID: ${res.id}\nKey: ${res.key}\n\n⚠️ SECURITY: Save this key immediately — it will NOT be shown again.\n⚠️ This key may appear in conversation history and logs. Rotate if compromised.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -40,7 +40,7 @@ export function registerApiKeyTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`api-keys/${params.api_key_id}`, "DELETE");
+      await api.makeRequest(`api-keys/${params.api_key_id}`, "DELETE");
       return textResult(`API key ${params.api_key_id} deleted and revoked.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

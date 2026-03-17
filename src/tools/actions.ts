@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 import { assertNoOperatorKeys } from "../services/security.js";
 
-export function registerActionTools(server: McpServer): void {
+export function registerActionTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_execute_action", {
     title: "Execute Action",
@@ -20,7 +20,7 @@ The action_type must match a registered action type, and the object must belong 
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("ebus/actions", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("ebus/actions", "POST", params);
       return textResult(`Action executed.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -44,7 +44,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
       if (payloadSize > 500000) {
         return errorResult("Error: Batch payload too large (max 500KB total).");
       }
-      const res = await makeApiRequest<Record<string, unknown>>("ebus/actions/batch", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("ebus/actions/batch", "POST", params);
       return textResult(`Batch of ${params.actions.length} actions executed.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -60,7 +60,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[]; next?: string }>("ebus/actions", "GET", undefined, params);
+      const res = await api.makeRequest<{ items: unknown[]; next?: string }>("ebus/actions", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -72,7 +72,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`ebus/actions/${params.action_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`ebus/actions/${params.action_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -87,7 +87,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("ebus/action-types", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("ebus/action-types", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -103,7 +103,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("ebus/action-types", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("ebus/action-types", "POST", params);
       return textResult(`Action type created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -121,7 +121,7 @@ Useful for complex operations like: mint + transfer + configure in one transacti
   }, async (params) => {
     try {
       const { action_type_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`ebus/action-types/${action_type_id}`, "PUT", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`ebus/action-types/${action_type_id}`, "PUT", body);
       return textResult(`Action type updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

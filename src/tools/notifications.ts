@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 
-export function registerNotificationTools(server: McpServer): void {
+export function registerNotificationTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_messages", {
     title: "List Messages",
@@ -13,7 +13,7 @@ export function registerNotificationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("messages", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("messages", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -31,7 +31,7 @@ export function registerNotificationTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("messages/send", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("messages/send", "POST", params);
       return textResult(`Notification sent to ${params.to.length} recipient(s).\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -43,7 +43,7 @@ export function registerNotificationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async () => {
     try {
-      const res = await makeApiRequest<unknown>("messages/templates");
+      const res = await api.makeRequest<unknown>("messages/templates");
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -60,7 +60,7 @@ export function registerNotificationTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("messages/templates", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("messages/templates", "POST", params);
       return textResult(`Message template created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -72,7 +72,7 @@ export function registerNotificationTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`messages/templates/${params.template_id}`, "DELETE");
+      await api.makeRequest(`messages/templates/${params.template_id}`, "DELETE");
       return textResult(`Message template ${params.template_id} deleted.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

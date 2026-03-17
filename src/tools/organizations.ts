@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 
-export function registerOrganizationTools(server: McpServer): void {
+export function registerOrganizationTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_organizations", {
     title: "List Organizations",
@@ -16,7 +16,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[]; next?: string }>("organizations", "GET", undefined, params);
+      const res = await api.makeRequest<{ items: unknown[]; next?: string }>("organizations", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -33,7 +33,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("organizations", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("organizations", "POST", params);
       return textResult(`Organization created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -45,7 +45,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`organizations/${params.organization_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`organizations/${params.organization_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -63,7 +63,7 @@ export function registerOrganizationTools(server: McpServer): void {
   }, async (params) => {
     try {
       const { organization_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`organizations/${organization_id}`, "PUT", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`organizations/${organization_id}`, "PUT", body);
       return textResult(`Organization updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -75,7 +75,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`organizations/${params.organization_id}/balance`);
+      const res = await api.makeRequest<Record<string, unknown>>(`organizations/${params.organization_id}/balance`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -87,7 +87,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[] }>(`organizations/${params.organization_id}/members`);
+      const res = await api.makeRequest<{ items: unknown[] }>(`organizations/${params.organization_id}/members`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -104,7 +104,7 @@ export function registerOrganizationTools(server: McpServer): void {
   }, async (params) => {
     try {
       const { organization_id, ...body } = params;
-      await makeApiRequest(`organizations/${organization_id}/members`, "POST", body);
+      await api.makeRequest(`organizations/${organization_id}/members`, "POST", body);
       return textResult(`Member ${params.wallet_id} added to organization.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -119,7 +119,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`organizations/${params.organization_id}/members/${params.member_id}`, "DELETE");
+      await api.makeRequest(`organizations/${params.organization_id}/members/${params.member_id}`, "DELETE");
       return textResult(`Member ${params.member_id} removed from organization.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -131,7 +131,7 @@ export function registerOrganizationTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<{ items: unknown[] }>(`organizations/${params.organization_id}/roles`);
+      const res = await api.makeRequest<{ items: unknown[] }>(`organizations/${params.organization_id}/roles`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -148,7 +148,7 @@ export function registerOrganizationTools(server: McpServer): void {
   }, async (params) => {
     try {
       const { organization_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`organizations/${organization_id}/roles`, "POST", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`organizations/${organization_id}/roles`, "POST", body);
       return textResult(`Role created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });

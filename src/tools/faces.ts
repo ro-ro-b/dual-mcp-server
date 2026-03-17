@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeApiRequest, handleApiError } from "../services/api-client.js";
+import { ApiClient, handleApiError } from "../services/api-client.js";
 import { textResult, errorResult } from "../services/formatters.js";
 import { CursorPaginationSchema, IdParam } from "../schemas/common.js";
 
-export function registerFaceTools(server: McpServer): void {
+export function registerFaceTools(server: McpServer, api: ApiClient): void {
 
   server.registerTool("dual_list_faces", {
     title: "List Faces",
@@ -13,7 +13,7 @@ export function registerFaceTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>("faces", "GET", undefined, params);
+      const res = await api.makeRequest<unknown>("faces", "GET", undefined, params);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -30,7 +30,7 @@ export function registerFaceTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>("faces", "POST", params);
+      const res = await api.makeRequest<Record<string, unknown>>("faces", "POST", params);
       return textResult(`Face created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -42,7 +42,7 @@ export function registerFaceTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<Record<string, unknown>>(`faces/${params.face_id}`);
+      const res = await api.makeRequest<Record<string, unknown>>(`faces/${params.face_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -59,7 +59,7 @@ export function registerFaceTools(server: McpServer): void {
   }, async (params) => {
     try {
       const { face_id, ...body } = params;
-      const res = await makeApiRequest<Record<string, unknown>>(`faces/${face_id}`, "PATCH", body);
+      const res = await api.makeRequest<Record<string, unknown>>(`faces/${face_id}`, "PATCH", body);
       return textResult(`Face updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -71,7 +71,7 @@ export function registerFaceTools(server: McpServer): void {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      await makeApiRequest(`faces/${params.face_id}`, "DELETE");
+      await api.makeRequest(`faces/${params.face_id}`, "DELETE");
       return textResult(`Face ${params.face_id} deleted.`);
     } catch (e) { return errorResult(handleApiError(e)); }
   });
@@ -83,7 +83,7 @@ export function registerFaceTools(server: McpServer): void {
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, async (params) => {
     try {
-      const res = await makeApiRequest<unknown>(`faces/template/${params.template_id}`);
+      const res = await api.makeRequest<unknown>(`faces/template/${params.template_id}`);
       return textResult(JSON.stringify(res, null, 2));
     } catch (e) { return errorResult(handleApiError(e)); }
   });
