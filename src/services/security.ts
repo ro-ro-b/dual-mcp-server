@@ -37,8 +37,18 @@ export function assertExternalUrl(urlString: string): void {
   if (BLOCKED_PREFIXES.some((p) => hostname.startsWith(p))) {
     throw new Error("Private network URLs are not allowed");
   }
-  // Block cloud metadata endpoints
-  if (hostname === "metadata.google.internal" || hostname.endsWith(".amazonaws.com")) {
+  // Block cloud metadata endpoints (not all cloud hostnames — public S3/GCS/Azure are OK)
+  const BLOCKED_CLOUD_METADATA = [
+    "metadata.google.internal",          // GCP instance metadata
+    "169.254.169.254",                    // AWS/Azure/GCP metadata IP (also caught by prefix check)
+    "metadata.azure.com",                // Azure IMDS (custom hostname alias)
+  ];
+  if (BLOCKED_CLOUD_METADATA.includes(hostname)) {
+    throw new Error("Cloud metadata URLs are not allowed");
+  }
+  // Block only the AWS EC2 metadata service hostname, not all of amazonaws.com
+  // (s3.amazonaws.com, *.s3.amazonaws.com etc. are legitimate public URLs)
+  if (hostname === "instance-data" || hostname === "latest") {
     throw new Error("Cloud metadata URLs are not allowed");
   }
 }

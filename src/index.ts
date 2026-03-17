@@ -106,8 +106,6 @@ async function runHTTP(): Promise<void> {
   const { StreamableHTTPServerTransport } = await import(
     "@modelcontextprotocol/sdk/server/streamableHttp.js"
   );
-  const { randomUUID } = await import("crypto");
-
   const app = express();
 
   // ── Security middleware ──────────────────────────────────────
@@ -126,29 +124,41 @@ async function runHTTP(): Promise<void> {
     next();
   });
 
-  // C3: Origin validation (DNS-rebinding defense)
+  // C3: Origin validation — default-on per MCP transport spec.
+  // Requests with an Origin header are rejected unless the origin is in CORS_ORIGIN.
+  // Requests WITHOUT an Origin header (server-to-server / curl) are allowed through.
+  // Set CORS_ORIGIN=* to disable origin checking entirely (not recommended).
   const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
     : [];
+  const CORS_WILDCARD = ALLOWED_ORIGINS.includes("*");
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
-    // If CORS_ORIGIN is configured, set CORS headers for allowed origins
-    if (ALLOWED_ORIGINS.length > 0 && origin && ALLOWED_ORIGINS.includes(origin)) {
+    // No Origin header = server-to-server request, allow through
+    if (!origin) return next();
+
+    // Wildcard disables origin checking (opt-in, not recommended)
+    if (CORS_WILDCARD) {
       res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+      return next();
     }
 
-    // Block requests with an Origin header that isn't in the allowlist
-    // (no Origin header = server-to-server, which is OK)
-    if (origin && ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(origin)) {
-      res.status(403).json({ error: "Origin not allowed." });
-      return;
+    // Check allowlist
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+      return next();
     }
 
-    next();
+    // Default: reject any browser request with an unrecognized Origin
+    res.status(403).json({
+      error: "Forbidden: Origin not allowed. Set CORS_ORIGIN to allowlist browser origins.",
+    });
   });
 
   // Rate limiting (in-memory)
@@ -206,11 +216,13 @@ async function runHTTP(): Promise<void> {
 
   // ── MCP endpoint ────────────────────────────────────────────
 
-  // M1: Fresh server + ApiClient per HTTP request (session isolation)
+  // M1: Fresh server + ApiClient per HTTP request (session isolation).
+  // Uses stateless mode (sessionIdGenerator: undefined) because each request
+  // gets its own McpServer — there is no cross-request session to track.
   app.post("/mcp", authMiddleware, async (req, res) => {
     const { server } = createServer();
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
     res.on("close", () => transport.close());
