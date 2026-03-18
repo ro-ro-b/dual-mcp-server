@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ApiClient } from "../services/api-client.js";
 import { aiRequest } from "../services/ai-client.js";
-import { textResult, errorResult } from "../services/formatters.js";
+import { textResult, errorResult, truncateIfNeeded } from "../services/formatters.js";
+import { IdParam } from "../schemas/common.js";
 
 export function registerCreativeTools(server: McpServer, api: ApiClient): void {
 
@@ -23,7 +24,7 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
   }, async (params) => {
     try {
       const res = await aiRequest<Record<string, unknown>>("creative", "/api/designs/generate", "POST", params);
-      return textResult(`Design generated:\n  ID: ${res.id}\n  Name: ${res.name}\n  Use case: ${res.useCase}\n  Version: ${res.version}\n\nTemplate spec:\n${JSON.stringify(res.templateSpec, null, 2)}`);
+      return textResult(truncateIfNeeded(`Design generated:\n  ID: ${res.id}\n  Name: ${res.name}\n  Use case: ${res.useCase}\n  Version: ${res.version}\n\nTemplate spec:\n${JSON.stringify(res.templateSpec, null, 2)}`));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -57,13 +58,13 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
     title: "Get Token Design",
     description: "Get a specific token design by ID with full template specification.",
     inputSchema: {
-      id: z.string().describe("Design ID"),
+      id: IdParam.describe("Design ID"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
     try {
       const res = await aiRequest("creative", `/api/designs/${params.id}`);
-      return textResult(JSON.stringify(res, null, 2));
+      return textResult(truncateIfNeeded(JSON.stringify(res, null, 2)));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -71,7 +72,7 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
     title: "Refine Token Design",
     description: "Refine an existing token design — add/remove fields, adjust properties.",
     inputSchema: {
-      id: z.string().describe("Design ID to refine"),
+      id: IdParam.describe("Design ID to refine"),
       refinement: z.string().max(1000).describe("Description of desired changes"),
       addFields: z.array(z.object({
         fieldName: z.string(),
@@ -86,7 +87,7 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
     try {
       const { id, ...body } = params;
       const res = await aiRequest<Record<string, unknown>>("creative", `/api/designs/${id}/refine`, "POST", body);
-      return textResult(`Design refined:\n  ID: ${res.id}\n  Name: ${res.name}\n  Version: ${res.version}\n\nUpdated spec:\n${JSON.stringify(res.templateSpec, null, 2)}`);
+      return textResult(truncateIfNeeded(`Design refined:\n  ID: ${res.id}\n  Name: ${res.name}\n  Version: ${res.version}\n\nUpdated spec:\n${JSON.stringify(res.templateSpec, null, 2)}`));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -94,7 +95,7 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
     title: "Delete Token Design",
     description: "Delete a token design by ID.",
     inputSchema: {
-      id: z.string().describe("Design ID"),
+      id: IdParam.describe("Design ID"),
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
@@ -155,7 +156,7 @@ export function registerCreativeTools(server: McpServer, api: ApiClient): void {
     title: "Render Face Template",
     description: "Render a face template with token data, producing HTML output.",
     inputSchema: {
-      templateId: z.string().describe("Face template ID"),
+      templateId: IdParam.describe("Face template ID"),
       tokenData: z.record(z.string(), z.unknown()).describe("Token data to bind into the template"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ApiClient } from "../services/api-client.js";
 import { aiRequest } from "../services/ai-client.js";
-import { textResult, errorResult } from "../services/formatters.js";
+import { textResult, errorResult, truncateIfNeeded } from "../services/formatters.js";
+import { IdParam } from "../schemas/common.js";
 
 export function registerGovernanceTools(server: McpServer, api: ApiClient): void {
 
@@ -84,7 +85,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Update Compliance Rule",
     description: "Update a compliance rule by ID.",
     inputSchema: {
-      id: z.string().describe("Rule ID"),
+      id: IdParam.describe("Rule ID"),
       name: z.string().optional(),
       type: z.enum(["aml_threshold", "transfer_limit", "restricted_wallet", "geographic"]).optional(),
       thresholdValue: z.string().optional(),
@@ -105,7 +106,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Delete Compliance Rule",
     description: "Delete a compliance rule by ID.",
     inputSchema: {
-      id: z.string().describe("Rule ID"),
+      id: IdParam.describe("Rule ID"),
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
@@ -133,7 +134,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
       if (params.limit) query.limit = String(params.limit);
       if (params.offset) query.offset = String(params.offset);
       const res = await aiRequest<Record<string, unknown>>("governance", "/api/compliance/audit", "GET", undefined, query);
-      return textResult(`Audit log (${res.total} entries):\n${JSON.stringify(res.logs, null, 2)}`);
+      return textResult(truncateIfNeeded(`Audit log (${res.total} entries):\n${JSON.stringify(res.logs, null, 2)}`));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -179,13 +180,13 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Get Policy",
     description: "Get a parsed policy document by ID.",
     inputSchema: {
-      id: z.string().describe("Policy ID"),
+      id: IdParam.describe("Policy ID"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
     try {
       const res = await aiRequest("governance", `/api/policies/${params.id}`);
-      return textResult(JSON.stringify(res, null, 2));
+      return textResult(truncateIfNeeded(JSON.stringify(res, null, 2)));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -193,7 +194,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Validate Policy",
     description: "Validate a parsed policy for internal consistency.",
     inputSchema: {
-      id: z.string().describe("Policy ID"),
+      id: IdParam.describe("Policy ID"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
@@ -228,13 +229,13 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Get Provenance Record",
     description: "Retrieve a provenance record by ID.",
     inputSchema: {
-      id: z.string().describe("Record ID"),
+      id: IdParam.describe("Record ID"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
     try {
       const res = await aiRequest("governance", `/api/provenance/${params.id}`);
-      return textResult(JSON.stringify(res, null, 2));
+      return textResult(truncateIfNeeded(JSON.stringify(res, null, 2)));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -242,7 +243,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Verify Provenance",
     description: "Verify AI-generated content by re-hashing and comparing to the stored provenance record.",
     inputSchema: {
-      id: z.string().describe("Provenance record ID"),
+      id: IdParam.describe("Provenance record ID"),
       content: z.string().describe("Content to verify against the stored hash"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -260,7 +261,7 @@ export function registerGovernanceTools(server: McpServer, api: ApiClient): void
     title: "Generate Verification Badge",
     description: "Generate a verification badge (certificate, seal, or QR) for a provenance record.",
     inputSchema: {
-      id: z.string().describe("Provenance record ID"),
+      id: IdParam.describe("Provenance record ID"),
       badgeType: z.enum(["certificate", "seal", "qr"]).optional().describe("Badge type (default certificate)"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

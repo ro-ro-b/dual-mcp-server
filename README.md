@@ -69,7 +69,7 @@ Add to your `claude_desktop_config.json`:
 
 ## API Modules & Tools
 
-### Core DUAL API (80 tools)
+### Core DUAL API (81 tools)
 
 | Module | Tools | Description |
 |--------|-------|-------------|

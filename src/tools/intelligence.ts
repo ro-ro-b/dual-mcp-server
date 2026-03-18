@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ApiClient } from "../services/api-client.js";
 import { aiRequest } from "../services/ai-client.js";
-import { textResult, errorResult } from "../services/formatters.js";
+import { textResult, errorResult, truncateIfNeeded } from "../services/formatters.js";
+import { IdParam } from "../schemas/common.js";
 
 export function registerIntelligenceTools(server: McpServer, api: ApiClient): void {
 
@@ -38,7 +39,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
   }, async () => {
     try {
       const res = await aiRequest<{ agents: unknown[]; total: number }>("intelligence", "/api/agents");
-      return textResult(`${res.total} agents:\n${JSON.stringify(res.agents, null, 2)}`);
+      return textResult(truncateIfNeeded(`${res.total} agents:\n${JSON.stringify(res.agents, null, 2)}`, res.total));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -46,13 +47,13 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
     title: "Get AI Agent",
     description: "Get details of a specific autonomous agent by ID.",
     inputSchema: {
-      id: z.string().describe("Agent ID"),
+      id: IdParam.describe("Agent ID"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (params) => {
     try {
       const res = await aiRequest("intelligence", `/api/agents/${params.id}`);
-      return textResult(JSON.stringify(res, null, 2));
+      return textResult(truncateIfNeeded(JSON.stringify(res, null, 2)));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -60,7 +61,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
     title: "Execute AI Agent",
     description: "Execute an agent, evaluating its rules against the provided context. Supports dry-run mode.",
     inputSchema: {
-      id: z.string().describe("Agent ID"),
+      id: IdParam.describe("Agent ID"),
       context: z.record(z.string(), z.unknown()).describe("Context data for rule evaluation"),
       dryRun: z.boolean().optional().describe("If true, evaluate rules without side effects"),
     },
@@ -102,7 +103,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
     title: "Get Lifecycle Predictions",
     description: "Get transfer likelihood, abandonment risk, and spike probability predictions for a specific object.",
     inputSchema: {
-      objectId: z.string().describe("Object ID to predict"),
+      objectId: IdParam.describe("Object ID to predict"),
       types: z.string().optional().describe("Comma-separated types: transfer,abandonment,spike"),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -191,7 +192,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
     title: "Find Similar Nodes",
     description: "Find nodes similar to a given node using metadata overlap, Jaccard, or cosine similarity.",
     inputSchema: {
-      nodeId: z.string().describe("Source node ID"),
+      nodeId: IdParam.describe("Source node ID"),
       similarityMetric: z.enum(["metadata", "jaccard", "cosine"]).optional().describe("Similarity metric"),
       limit: z.number().int().min(1).max(100).optional().describe("Max results"),
     },
@@ -199,7 +200,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
   }, async (params) => {
     try {
       const res = await aiRequest<Record<string, unknown>>("intelligence", "/api/graph/query/similar", "POST", params);
-      return textResult(`Similar nodes:\n${JSON.stringify(res, null, 2)}`);
+      return textResult(truncateIfNeeded(`Similar nodes:\n${JSON.stringify(res, null, 2)}`));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
@@ -207,7 +208,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
     title: "Graph Traversal",
     description: "Find all nodes connected to a given node within N hops using BFS.",
     inputSchema: {
-      nodeId: z.string().describe("Source node ID"),
+      nodeId: IdParam.describe("Source node ID"),
       maxHops: z.number().int().min(1).max(5).optional().describe("Max traversal depth (1-5, default 2)"),
       edgeTypes: z.array(z.string()).optional().describe("Filter by edge types"),
     },
@@ -215,7 +216,7 @@ export function registerIntelligenceTools(server: McpServer, api: ApiClient): vo
   }, async (params) => {
     try {
       const res = await aiRequest<Record<string, unknown>>("intelligence", "/api/graph/query/connected", "POST", params);
-      return textResult(`Connected nodes:\n${JSON.stringify(res, null, 2)}`);
+      return textResult(truncateIfNeeded(`Connected nodes:\n${JSON.stringify(res, null, 2)}`));
     } catch (e: unknown) { return errorResult(e instanceof Error ? e.message : String(e)); }
   });
 
