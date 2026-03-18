@@ -35,8 +35,14 @@ export DUAL_API_KEY=your-api-key
 # Option 2: JWT Token
 export DUAL_ACCESS_TOKEN=your-jwt-token
 
-# Option 3: Use the dual_login tool interactively
+# Option 3: Use the dual_login tool interactively (stdio mode only — see note below)
 ```
+
+> **Note on `dual_login` and HTTP mode:** HTTP mode is stateless — each request creates a fresh
+> server and API client, so any auth state set by `dual_login` is discarded after that single
+> request. For HTTP deployments, always supply credentials via environment variable
+> (`DUAL_API_KEY` or `DUAL_ACCESS_TOKEN`) rather than calling `dual_login` interactively.
+> Interactive login via `dual_login` only works reliably in stdio mode.
 
 ### Run
 

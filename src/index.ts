@@ -216,6 +216,21 @@ async function runHTTP(): Promise<void> {
 
   // ── MCP endpoint ────────────────────────────────────────────
 
+  // C5: Respond to CORS preflight requests (OPTIONS /mcp).
+  // Browser clients send an OPTIONS preflight before POST to verify CORS policy.
+  // Without this handler, preflights return an unexpected response and browser
+  // clients fail before they can send any JSON-RPC request.
+  app.options("/mcp", (req, res) => {
+    const origin = req.headers.origin;
+    if (origin && (CORS_WILDCARD || ALLOWED_ORIGINS.includes(origin))) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+      res.setHeader("Access-Control-Max-Age", "86400");
+    }
+    res.status(204).end();
+  });
+
   // M1: Fresh server + ApiClient per HTTP request (session isolation).
   // Uses stateless mode (sessionIdGenerator: undefined) because each request
   // gets its own McpServer — there is no cross-request session to track.
