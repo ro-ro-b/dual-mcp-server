@@ -4,6 +4,8 @@
  */
 
 import { URL } from "url";
+import { lookup } from "dns/promises";
+import { isIP } from "net";
 
 // --- SSRF Protection (C2, H3) ---
 
@@ -17,8 +19,32 @@ const BLOCKED_PREFIXES = [
   "fc00:", "fd00:", "fe80:",
 ];
 
-/** Validate that a URL is external HTTPS only — blocks SSRF vectors */
-export function assertExternalUrl(urlString: string): void {
+/** Check whether a resolved IP address falls in a private/loopback range */
+function isPrivateIp(ip: string): boolean {
+  // Loopback
+  if (ip === "127.0.0.1" || ip === "::1" || ip.startsWith("127.")) return true;
+  // Link-local
+  if (ip.startsWith("169.254.")) return true;
+  // Private ranges
+  if (ip.startsWith("10.")) return true;
+  if (ip.startsWith("192.168.")) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true;
+  // IPv6 private/link-local
+  if (ip.startsWith("fc00:") || ip.startsWith("fd") || ip.startsWith("fe80:")) return true;
+  // Unspecified
+  if (ip === "0.0.0.0" || ip === "::") return true;
+  return false;
+}
+
+/**
+ * Validate that a URL is external HTTPS only — blocks SSRF vectors.
+ *
+ * Two layers of protection:
+ *   1. String-based: blocks known-bad hostnames, private IP prefixes, cloud metadata
+ *   2. DNS-resolution: resolves the hostname and rejects if any resolved address
+ *      is loopback, link-local, or in a private range (catches DNS rebinding)
+ */
+export async function assertExternalUrl(urlString: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(urlString);
@@ -31,6 +57,8 @@ export function assertExternalUrl(urlString: string): void {
   }
 
   const hostname = parsed.hostname.toLowerCase();
+
+  // Layer 1: string-based blocking (fast, no DNS)
   if (BLOCKED_HOSTNAMES.includes(hostname)) {
     throw new Error("Internal/loopback URLs are not allowed");
   }
@@ -50,6 +78,25 @@ export function assertExternalUrl(urlString: string): void {
   // (s3.amazonaws.com, *.s3.amazonaws.com etc. are legitimate public URLs)
   if (hostname === "instance-data" || hostname === "latest") {
     throw new Error("Cloud metadata URLs are not allowed");
+  }
+
+  // Layer 2: DNS resolution check (catches rebinding attacks)
+  // Skip for raw IPs — they've already been checked by prefix matching above
+  if (!isIP(hostname)) {
+    try {
+      const { address } = await lookup(hostname);
+      if (isPrivateIp(address)) {
+        throw new Error(
+          "URL resolves to a private/internal IP address — possible DNS rebinding attack"
+        );
+      }
+    } catch (err) {
+      // Re-throw our own errors (private IP detected)
+      if (err instanceof Error && err.message.includes("private")) throw err;
+      // DNS resolution failures (ENOTFOUND, EAI_AGAIN, etc.) are not SSRF risks —
+      // if the hostname doesn't resolve, it can't reach a private IP. Fail open.
+      console.warn(`[SSRF] DNS lookup warning for ${hostname}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 }
 

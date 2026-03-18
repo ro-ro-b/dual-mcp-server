@@ -37,7 +37,7 @@ export function registerWebhookTools(server: McpServer, api: ApiClient): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      assertExternalUrl(params.url);
+      await assertExternalUrl(params.url);
       const res = await api.makeRequest<Record<string, unknown>>("webhooks", "POST", params);
       return textResult(`Webhook created.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }
@@ -67,7 +67,7 @@ export function registerWebhookTools(server: McpServer, api: ApiClient): void {
   }, async (params) => {
     try {
       const { webhook_id, ...body } = params;
-      if (body.url) assertExternalUrl(body.url);
+      if (body.url) await assertExternalUrl(body.url);
       const res = await api.makeRequest<Record<string, unknown>>(`webhooks/${webhook_id}`, "PATCH", body);
       return textResult(`Webhook updated.\n${JSON.stringify(res, null, 2)}`);
     } catch (e) { return errorResult(handleApiError(e)); }

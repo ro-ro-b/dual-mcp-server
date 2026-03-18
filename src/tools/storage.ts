@@ -17,7 +17,7 @@ export function registerStorageTools(server: McpServer, api: ApiClient): void {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async (params) => {
     try {
-      assertExternalUrl(params.file_url);
+      await assertExternalUrl(params.file_url);
       const res = await api.makeRequest<{ id: string; url: string }>("storage/upload", "POST", params);
       return textResult(`File uploaded.\nID: ${res.id}\nURL: ${res.url}`);
     } catch (e) { return errorResult(handleApiError(e)); }
